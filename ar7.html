@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fazbear AR: Multiverse Terminal</title>
+    <style>
+        :root { 
+            --common: #888; --rare: #0074D9; --epic: #B10DC9; 
+            --legendary: #FF851B; --glitch: #FF4136; --fnaf-green: #0f0; 
+        }
+        body { margin: 0; background: #000; color: var(--fnaf-green); font-family: 'Courier New', monospace; overflow: hidden; }
+        .screen { display: none; padding: 20px; text-align: center; height: 100vh; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
+        .active { display: flex; }
+        
+        /* HUD */
+        .hud { position: absolute; top: 0; width: 100%; display: flex; justify-content: space-around; background: rgba(0,0,0,0.9); padding: 10px; z-index: 100; border-bottom: 2px solid #333; }
+        button { background: #111; color: var(--fnaf-green); border: 1px solid var(--fnaf-green); padding: 10px 20px; cursor: pointer; margin: 5px; font-weight: bold; text-transform: uppercase; }
+        button:hover { background: #222; box-shadow: 0 0 10px var(--fnaf-green); }
+
+        /* Goal UI */
+        #goal-container { background: #050505; border: 1px solid #333; padding: 10px; width: 320px; text-align: left; margin: 10px auto; font-size: 12px; }
+        .goal-item { margin: 5px 0; border-bottom: 1px solid #222; }
+        .done { color: #444; text-decoration: line-through; }
+
+        /* Minigames */
+        #shock-track { width: 300px; height: 30px; background: #222; position: relative; border: 2px solid #555; margin: 20px; }
+        #shock-target { width: 40px; height: 100%; background: #fff; position: absolute; left: 130px; box-shadow: 0 0 15px #fff; }
+        #shock-pointer { width: 6px; height: 100%; background: var(--fnaf-green); position: absolute; left: 0; }
+        
+        #audio-bar-bg { width: 250px; height: 20px; background: #222; border: 1px solid #fff; margin: 20px; overflow: hidden; }
+        #audio-bar { width: 0%; height: 100%; background: var(--fnaf-red); transition: 0.1s; }
+
+        /* Index */
+        .scroll-box { height: 70vh; overflow-y: auto; width: 95%; border: 1px solid #333; padding: 15px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; background: #050505; }
+        .card { border: 2px solid #222; padding: 15px; background: #111; position: relative; border-radius: 5px; opacity: 0.3; }
+        .unlocked { opacity: 1; border-color: var(--fnaf-green); }
+        .rarity-tag { font-size: 10px; padding: 2px 6px; position: absolute; top: 5px; right: 5px; color: #000; font-weight: bold; }
+        .Common { background: var(--common); } .Rare { background: var(--rare); color: #fff; }
+        .Epic { background: var(--epic); color: #fff; } .Legendary { background: var(--legendary); color: #fff; }
+        .Glitch { background: var(--glitch); color: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="hud">
+    <div>REMNANT: <span id="h-rem">0</span></div>
+    <div>SCRAP: <span id="h-parts">0</span></div>
+    <div>UNLOCKED: <span id="h-count">0</span>/116</div>
+</div>
+
+<div id="menu-screen" class="screen active">
+    <h1 style="text-shadow: 0 0 15px var(--fnaf-green);">FAZBEAR HUB</h1>
+    <div id="goal-container">
+        <strong>CURRENT OBJECTIVES:</strong>
+        <div id="goal-list"></div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr;">
+        <button onclick="startShock()">SHOCK ENCOUNTER</button>
+        <button onclick="startAudio()">AUDIO LURE</button>
+        <button onclick="startHack()">SYSTEM OVERRIDE</button>
+        <button onclick="showIndex()">INDEX</button>
+    </div>
+</div>
+
+<div id="shock-screen" class="screen">
+    <h2>STABILIZE FREQUENCY</h2>
+    <div id="shock-track"><div id="shock-target"></div><div id="shock-pointer"></div></div>
+    <button onclick="checkShock()">RELEASE VOLTAGE</button>
+</div>
+
+<div id="audio-screen" class="screen">
+    <h2>REACTION CALIBRATION</h2>
+    <p>Wait for the signal to turn GREEN!</p>
+    <div id="audio-bar-bg"><div id="audio-bar"></div></div>
+    <button onclick="checkAudio()">LURE UNIT</button>
+</div>
+
+<div id="hack-screen" class="screen">
+    <h2>FIREWALL BYPASS</h2>
+    <div id="hack-code-display" style="font-size: 40px; margin: 20px; color:#fff;">----</div>
+    <input type="text" id="hack-input" placeholder="RETYPE CODE" maxlength="4" style="background:#000; color:#0f0; border:1px solid #0f0; text-align:center; padding:10px; font-size:20px;">
+    <button onclick="checkHack()">SUBMIT</button>
+</div>
+
+<div id="index-screen" class="screen">
+    <h2>ANIMATRONIC DATABASE</h2>
+    <div id="index-list" class="scroll-box"></div>
+    <button onclick="showScreen('menu-screen')">EXIT</button>
+</div>
+
+<script>
+// --- ROSTER DATA ---
+const roster = {
+    "FreddyFazbear": "Common", "Bonnie": "Common", "Chica": "Common", "Foxy": "Common", "Endo01": "Common", "Endo02": "Common", "BalloonBoy": "Common", "JJ": "Common", "Helpy": "Common", "HappyFrog": "Common", "MrHippo": "Common", "NeddBear": "Common", "Pigpatch": "Common", "No1Crate": "Common", "MrCanDo": "Common", "MrHugs": "Common", "PanStan": "Common", "StaffBot": "Common", "MapBot": "Common", "TrashAndTheGang": "Common",
+    "ToyFreddy": "Rare", "ToyBonnie": "Rare", "ToyChica": "Rare", "Mangle": "Rare", "WitheredFreddy": "Rare", "WitheredBonnie": "Rare", "WitheredChica": "Rare", "WitheredFoxy": "Rare", "PhantomFreddy": "Rare", "PhantomChica": "Rare", "PhantomFoxy": "Rare", "PhantomBB": "Rare", "PhantomMangle": "Rare", "PhantomPuppet": "Rare", "RockstarFreddy": "Rare", "RockstarBonnie": "Rare", "RockstarChica": "Rare", "RockstarFoxy": "Rare", "OrvilleElephant": "Rare", "MusicMan": "Rare", "ElChip": "Rare", "SecurityPuppet": "Rare", "Electrobab": "Rare", "Bidybab": "Rare", "Minireena": "Rare", "Bonnet": "Rare",
+    "GoldenFreddy": "Epic", "ShadowFreddy": "Epic", "ShadowBonnie": "Epic", "Springtrap": "Epic", "ThePuppet": "Epic", "CircusBaby": "Epic", "Ballora": "Epic", "FuntimeFreddy": "Epic", "FuntimeFoxy": "Epic", "Ennard": "Epic", "Yenndo": "Epic", "MoltenFreddy": "Epic", "Scraptrap": "Epic", "Lefty": "Epic", "GlamrockFreddy": "Epic", "GlamrockChica": "Epic", "RoxanneWolf": "Epic", "MontgomeryGator": "Epic", "DaycareAttendant": "Epic", "Sun": "Epic", "Moon": "Epic", "DJMusicMan": "Epic", "FuntimeChica": "Epic",
+    "NightmareFreddy": "Legendary", "NightmareBonnie": "Legendary", "NightmareChica": "Legendary", "NightmareFoxy": "Legendary", "NightmareMangle": "Legendary", "Nightmarionne": "Legendary", "NightmareBB": "Legendary", "Nightmare": "Legendary", "Plushtrap": "Legendary", "JackOLantern": "Legendary", "JackOLanternChica": "Legendary", "ScrapBaby": "Legendary", "Burntrap": "Legendary", "TheBlob": "Legendary", "Vanny": "Legendary", "Fredbear": "Legendary", "SpringBonnie": "Legendary", "Frostbear": "Legendary", "RadioactiveFoxy": "Legendary", "ToxicSpringtrap": "Legendary", "FlamethrowerBareEndo": "Legendary", "HighscoreToyChica": "Legendary", "DarkSpringtrap": "Legendary", "FreddyFazbearNightmare": "Legendary", "MiniMusicMan": "Legendary", "WindUpMusicMan": "Legendary",
+    "Glitchtrap": "Glitch", "VRabbit": "Glitch", "ShatteredGlamrockFreddy": "Glitch", "ShatteredGlamrockChica": "Glitch", "ShatteredRoxanneWolf": "Glitch", "ShatteredMontgomeryGator": "Glitch", "AdventureFreddy": "Glitch", "AdventureBonnie": "Glitch", "AdventureChica": "Glitch", "AdventureFoxy": "Glitch", "AdventureGoldenFreddy": "Glitch", "AdventureSpringtrap": "Glitch", "AdventureEndo01": "Glitch", "AdventureEndo02": "Glitch", "AdventurePlushtrap": "Glitch", "AdventureNightmare": "Glitch", "AdventureNightmarionne": "Glitch", "AdventureBalloonBoy": "Glitch", "AdventureJJ": "Glitch", "AdventureMangle": "Glitch", "AdventurePuppet": "Glitch", "AdventureCircusBaby": "Glitch", "AdventureFuntimeFreddy": "Glitch", "AdventureFuntimeFoxy": "Glitch", "AdventureBallora": "Glitch", "AdventureEnnard": "Glitch"
+};
+
+let game = {
+    remnant: 50, scrap: 0, collection: [],
+    shockPos: 0, shockDir: 1, active: false,
+    goals: [
+        { id: 'g1', text: "Capture 5 Units", target: 5, cur: 0, reward: 100, type: 'cap', done: false },
+        { id: 'g2', text: "Earn 200 Scrap", target: 200, cur: 0, reward: 150, type: 'scrap', done: false },
+        { id: 'g3', text: "Unlock a Glitch Unit", target: 1, cur: 0, reward: 300, type: 'glitch', done: false }
+    ]
+};
+
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    updateHUD();
+}
+
+function updateHUD() {
+    document.getElementById('h-rem').innerText = game.remnant;
+    document.getElementById('h-parts').innerText = game.scrap;
+    document.getElementById('h-count').innerText = game.collection.length;
+    renderGoals();
+}
+
+function renderGoals() {
+    const list = document.getElementById('goal-list');
+    list.innerHTML = '';
+    game.goals.forEach(g => {
+        list.innerHTML += `<div class="goal-item ${g.done ? 'done' : ''}">${g.text} (${g.cur}/${g.target})</div>`;
+    });
+}
+
+function track(type, amt, rarity = "") {
+    game.goals.forEach(g => {
+        if (g.done) return;
+        if (g.type === type) g.cur += amt;
+        if (g.type === 'glitch' && rarity === 'Glitch') g.cur += 1;
+        if (g.cur >= g.target) { g.done = true; game.remnant += g.reward; alert("GOAL COMPLETE: " + g.text); }
+    });
+}
+
+// --- MINIGAMES ---
+function startShock() {
+    game.active = true; showScreen('shock-screen');
+    function anim() {
+        if (!game.active) return;
+        game.shockPos += 6 * game.shockDir;
+        if (game.shockPos > 260 || game.shockPos < 0) game.shockDir *= -1;
+        document.getElementById('shock-pointer').style.left = game.shockPos + 'px';
+        requestAnimationFrame(anim);
+    }
+    anim();
+}
+function checkShock() {
+    game.active = false;
+    if (game.shockPos >= 130 && game.shockPos <= 170) win();
+    else alert("LOST CONNECTION");
+    showScreen('menu-screen');
+}
+
+let audioActive = false;
+function startAudio() {
+    showScreen('audio-screen');
+    const bar = document.getElementById('audio-bar');
+    bar.style.width = '0%'; bar.style.backgroundColor = 'red';
+    setTimeout(() => {
+        bar.style.width = '100%'; bar.style.backgroundColor = 'green';
+        audioActive = true;
+    }, 1500 + Math.random() * 2000);
+}
+function checkAudio() {
+    if (audioActive) { win(); audioActive = false; }
+    else alert("SIGNAL FAILURE");
+    showScreen('menu-screen');
+}
+
+let hackTarget = "";
+function startHack() {
+    hackTarget = Math.floor(1000 + Math.random() * 8999).toString();
+    document.getElementById('hack-code-display').innerText = hackTarget;
+    document.getElementById('hack-input').value = "";
+    showScreen('hack-screen');
+}
+function checkHack() {
+    if (document.getElementById('hack-input').value === hackTarget) {
+        game.scrap += 50; track('scrap', 50); alert("HACK SUCCESS: +50 Scrap");
+    } else alert("FIREWALL DETECTED");
+    showScreen('menu-screen');
+}
+
+function win() {
+    const keys = Object.keys(roster);
+    const result = keys[Math.floor(Math.random() * keys.length)];
+    if (!game.collection.includes(result)) game.collection.push(result);
+    track('cap', 1, roster[result]);
+    alert("CAPTURED: " + result + " (" + roster[result] + ")");
+}
+
+function showIndex() {
+    const list = document.getElementById('index-list');
+    list.innerHTML = '';
+    Object.keys(roster).forEach(name => {
+        const owned = game.collection.includes(name);
+        const rare = roster[name];
+        list.innerHTML += `<div class="card ${owned ? 'unlocked' : ''}">
+            <span class="rarity-tag ${rare}">${rare}</span>
+            <h4 style="margin-top:20px;">${owned ? name : '???' }</h4>
+        </div>`;
+    });
+    showScreen('index-screen');
+}
+</script>
+</body>
+</html>
